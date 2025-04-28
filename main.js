@@ -341,26 +341,41 @@ async function checkInactiveUsers() {
 
 function shouldCheckMember(member, serverConfig) {
   try {
+    console.log(`🔍 Checking roles for member: ${member.user.tag} (${member.id})`);
     const memberRoles = member.roles.cache.map(role => role.id);
+    console.log(`👤 Member has roles: ${memberRoles.join(', ')}`);
+    console.log(`🛡️ Safe roles: ${serverConfig.safeRoles.join(', ')}`);
+    console.log(`⚠️ Non-safe roles: ${serverConfig.nonSafeRoles.join(', ')}`);
     
-  
-    const hasSafeRole = memberRoles.some(roleId => 
-      serverConfig.safeRoles.includes(roleId)
-    );
+    // Check if user has any safe role (after trimming whitespace)
+    const safeRoles = serverConfig.safeRoles.map(role => role.trim());
+    const hasSafeRole = memberRoles.some(roleId => safeRoles.includes(roleId));
     
-
-    if (hasSafeRole) return false;
+    if (hasSafeRole) {
+      const safeRole = memberRoles.find(roleId => safeRoles.includes(roleId));
+      console.log(`✅ User ${member.user.tag} has safe role: ${safeRole}, skipping inactivity check`);
+      return false;
+    } else {
+      console.log(`❌ User ${member.user.tag} has no safe roles`);
+    }
     
-   
-    const hasNonSafeRole = memberRoles.some(roleId => 
-      serverConfig.nonSafeRoles.includes(roleId)
-    );
+    // Check if they have any non-safe role that should be checked
+    const nonSafeRoles = serverConfig.nonSafeRoles.map(role => role.trim());
+    const hasNonSafeRole = memberRoles.some(roleId => nonSafeRoles.includes(roleId));
     
-  
+    if (hasNonSafeRole) {
+      const nonSafeRole = memberRoles.find(roleId => nonSafeRoles.includes(roleId));
+      console.log(`⚠️ User ${member.user.tag} has non-safe role: ${nonSafeRole}, will check for inactivity`);
+    } else {
+      console.log(`🔄 User ${member.user.tag} has no monitored non-safe roles, skipping inactivity check`);
+      return false; // If they don't have any of the specified non-safe roles, don't check them
+    }
+    
+    // Only check members who have at least one of the specified non-safe roles
     return hasNonSafeRole;
   } catch (error) {
     console.error(`❌ Error checking roles for member ${member?.user?.tag || 'unknown'}:`, error);
-    return false; 
+    return false; // Skip this member if there's an error
   }
 }
 
