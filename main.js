@@ -12,7 +12,6 @@ const client = new Client({
   ]
 });
 
-
 connectToMongoDB();
 
 function connectToMongoDB() {
@@ -26,12 +25,10 @@ function connectToMongoDB() {
     });
 }
 
-
 mongoose.connection.on('disconnected', () => {
   console.log('❌ MongoDB disconnected! Attempting to reconnect...');
   connectToMongoDB();
 });
-
 
 process.on('SIGINT', async () => {
   console.log('Shutting down bot gracefully...');
@@ -47,7 +44,6 @@ process.on('SIGINT', async () => {
   }
 });
 
-
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
@@ -56,17 +52,15 @@ client.once('ready', () => {
   console.log(`🤖 Bot is online as ${client.user.tag}`);
   console.log(`📊 Monitoring ${config.servers.filter(s => s.status).length} active servers`);
   
-
   config.servers.forEach(server => {
     const status = server.status ? 'ACTIVE' : 'INACTIVE';
-    console.log(`Server ${server.id}: ${status} (${server.duration} days inactivity threshold)`);
+    console.log(`Server ${server.id}: ${status} (${server.duration} minutes inactivity threshold)`);
   });
   
-
-  console.log('⏱️ Starting inactive user check schedule (hourly)');
-  setInterval(checkInactiveUsers, 60 * 60 * 1000); 
+  console.log('⏱️ Starting inactive user check schedule (every 5 minutes)');
+  // Changed to check every 5 minutes instead of hourly
+  setInterval(checkInactiveUsers, 5 * 60 * 1000); 
   
- 
   setTimeout(() => {
     console.log('🔍 Running initial inactive user check...');
     checkInactiveUsers();
@@ -74,13 +68,11 @@ client.once('ready', () => {
 
   async function updateBotStatus() {
     try {
-   
       let totalMembers = 0;
       
       for (const serverConfig of config.servers.filter(s => s.status)) {
         const guild = client.guilds.cache.get(serverConfig.id);
         if (guild) {
-         
           try {
             if (guild.members.cache.size === 0) {
               await guild.members.fetch();
@@ -93,7 +85,6 @@ client.once('ready', () => {
         }
       }
       
-  
       client.user.setPresence({
         activities: [{ 
           name: `${totalMembers} members`, 
@@ -124,7 +115,6 @@ async function trackAllExistingMembers() {
         
         console.log(`📋 Tracking members in: ${guild.name} (${guild.id})`);
         
-       
         try {
           await guild.members.fetch();
           console.log(`✅ Successfully fetched ${guild.members.cache.size} members in ${guild.name}`);
@@ -133,24 +123,20 @@ async function trackAllExistingMembers() {
           continue;
         }
         
-      
         const membersToTrack = guild.members.cache.filter(member => 
           !member.user.bot && shouldCheckMember(member, serverConfig)
         );
         
         console.log(`👥 Found ${membersToTrack.size} members to track in ${guild.name}`);
         
-        
         let trackCount = 0;
         for (const member of membersToTrack.values()) {
           try {
-         
             const existingRecord = await UserActivity.findOne({
               userId: member.id,
               guildId: guild.id
             });
             
-         
             if (!existingRecord) {
               await UserActivity.create({
                 userId: member.id,
@@ -174,13 +160,11 @@ async function trackAllExistingMembers() {
     console.log('✅ Completed tracking all existing members');
   }
   
-
   client.on('guildMemberAdd', async (member) => {
     try {
       const guildConfig = config.servers.find(server => server.id === member.guild.id);
       if (!guildConfig || !guildConfig.status) return;
       
-     
       if (shouldCheckMember(member, guildConfig)) {
         await UserActivity.findOneAndUpdate(
           { userId: member.id, guildId: member.guild.id },
@@ -194,19 +178,15 @@ async function trackAllExistingMembers() {
     }
   });
   
-  
-  
   client.on('guildCreate', async (guild) => {
     console.log(`🎉 Bot joined a new server: ${guild.name} (${guild.id})`);
     
-  
     const guildConfig = config.servers.find(server => server.id === guild.id);
     if (!guildConfig || !guildConfig.status) {
       console.log(`⚠️ Server ${guild.name} is not in active configuration, skipping member tracking`);
       return;
     }
     
- 
     try {
       await guild.members.fetch();
       
@@ -243,7 +223,6 @@ client.on('messageCreate', async (message) => {
   if (!guildConfig || !guildConfig.status) return;
   
   try {
-  
     await UserActivity.findOneAndUpdate(
       { userId: message.author.id, guildId: message.guild.id },
       { lastActivity: new Date() },
@@ -253,7 +232,6 @@ client.on('messageCreate', async (message) => {
     console.error(`❌ Error updating activity for user ${message.author.tag}:`, error);
   }
 });
-
 
 async function checkInactiveUsers() {
   console.log('🔄 Starting inactive user check...');
@@ -272,7 +250,6 @@ async function checkInactiveUsers() {
       console.log(`📋 Checking server: ${guild.name} (${guild.id})`);
       
       try {
-      
         let membersLoaded = false;
         let retryCount = 0;
         
@@ -292,7 +269,6 @@ async function checkInactiveUsers() {
           continue;
         }
         
-       
         const members = guild.members.cache.filter(member => 
           !member.user.bot && shouldCheckMember(member, serverConfig)
         );
@@ -300,7 +276,6 @@ async function checkInactiveUsers() {
         console.log(`👥 Found ${members.size} members to check in ${guild.name}`);
         totalChecked += members.size;
         
-       
         let serverKickCount = 0;
         for (const member of members.values()) {
           try {
@@ -309,8 +284,8 @@ async function checkInactiveUsers() {
               guildId: guild.id
             });
             
-        
-            const inactiveThreshold = serverConfig.duration * 24 * 60 * 60 * 1000;
+            // Changed from days to minutes
+            const inactiveThreshold = serverConfig.duration * 60 * 1000; // duration in minutes * milliseconds
             
             const now = new Date();
             const lastActive = userActivity ? userActivity.lastActivity : null;
@@ -338,7 +313,6 @@ async function checkInactiveUsers() {
   console.log(`✅ Inactive user check complete. Checked ${totalChecked} members, kicked ${totalKicked} members.`);
 }
 
-
 function shouldCheckMember(member, serverConfig) {
   try {
     console.log(`🔍 Checking roles for member: ${member.user.tag} (${member.id})`);
@@ -354,7 +328,7 @@ function shouldCheckMember(member, serverConfig) {
     if (hasSafeRole) {
       const safeRole = memberRoles.find(roleId => safeRoles.includes(roleId));
       console.log(`✅ User ${member.user.tag} has safe role: ${safeRole}, skipping inactivity check`);
-      return false;
+      return false; // Skip if user has any safe role
     } else {
       console.log(`❌ User ${member.user.tag} has no safe roles`);
     }
@@ -366,46 +340,41 @@ function shouldCheckMember(member, serverConfig) {
     if (hasNonSafeRole) {
       const nonSafeRole = memberRoles.find(roleId => nonSafeRoles.includes(roleId));
       console.log(`⚠️ User ${member.user.tag} has non-safe role: ${nonSafeRole}, will check for inactivity`);
+      return true; // Check this member for inactivity
     } else {
       console.log(`🔄 User ${member.user.tag} has no monitored non-safe roles, skipping inactivity check`);
-      return false; // If they don't have any of the specified non-safe roles, don't check them
+      return false; // Skip if they don't have any of the specified non-safe roles
     }
-    
-    // Only check members who have at least one of the specified non-safe roles
-    return hasNonSafeRole;
   } catch (error) {
     console.error(`❌ Error checking roles for member ${member?.user?.tag || 'unknown'}:`, error);
     return false; // Skip this member if there's an error
   }
 }
 
-
 async function kickInactiveMember(member, guild, serverConfig, lastActive) {
   try {
-
-    const inactiveDays = lastActive ? 
-      Math.floor((new Date() - lastActive) / (24 * 60 * 60 * 1000)) : 
+    // Changed from days to minutes
+    const inactiveMinutes = lastActive ? 
+      Math.floor((new Date() - lastActive) / (60 * 1000)) : 
       serverConfig.duration;
     
-    console.log(`⏱️ Member ${member.user.tag} inactive for ${inactiveDays} days`);
-    
+    console.log(`⏱️ Member ${member.user.tag} inactive for ${inactiveMinutes} minutes`);
     
     try {
       await member.send({
-        content: `You have been removed from **${guild.name}** for inactivity (${inactiveDays} ${inactiveDays === 1 ? 'day' : 'days'} since last message).`
+        content: `You have been removed from **${guild.name}** for inactivity (${inactiveMinutes} ${inactiveMinutes === 1 ? 'minute' : 'minutes'} since last message).`
       });
       console.log(`📧 Successfully sent DM to ${member.user.tag}`);
     } catch (dmError) {
       console.log(`📧 Could not DM ${member.user.tag}: ${dmError.message}`);
     }
 
-
     let kickSuccess = false;
     let kickAttempts = 0;
     
     while (!kickSuccess && kickAttempts < 3) {
       try {
-        await member.kick(`Inactivity: ${inactiveDays} days without a message`);
+        await member.kick(`Inactivity: ${inactiveMinutes} minutes without a message`);
         kickSuccess = true;
       } catch (kickError) {
         kickAttempts++;
@@ -419,7 +388,6 @@ async function kickInactiveMember(member, guild, serverConfig, lastActive) {
       return false;
     }
     
-   
     try {
       const logChannel = guild.channels.cache.get(serverConfig.logChannelId);
       if (logChannel) {
@@ -429,7 +397,7 @@ async function kickInactiveMember(member, guild, serverConfig, lastActive) {
           .setThumbnail(member.user.displayAvatarURL())
           .addFields(
             { name: 'User', value: `${member.user.tag} (${member.id})` },
-            { name: 'Reason', value: `Inactivity: ${inactiveDays} days without a message` },
+            { name: 'Reason', value: `Inactivity: ${inactiveMinutes} minutes without a message` },
             { name: 'Last Active', value: lastActive ? `<t:${Math.floor(lastActive.getTime() / 1000)}:F>` : 'Never active' }
           )
           .setTimestamp();
@@ -443,7 +411,6 @@ async function kickInactiveMember(member, guild, serverConfig, lastActive) {
       console.error(`❌ Error logging kick:`, logError);
     }
     
-   
     try {
       await UserActivity.findOneAndDelete({
         userId: member.id,
@@ -454,14 +421,13 @@ async function kickInactiveMember(member, guild, serverConfig, lastActive) {
       console.error(`❌ Error deleting activity record:`, deleteError);
     }
     
-    console.log(`👢 Successfully kicked ${member.user.tag} from ${guild.name} for ${inactiveDays} days of inactivity`);
+    console.log(`👢 Successfully kicked ${member.user.tag} from ${guild.name} for ${inactiveMinutes} minutes of inactivity`);
     return true;
   } catch (error) {
     console.error(`❌ Error in kick process for ${member.user.tag}:`, error);
     return false;
   }
 }
-
 
 function loginBot() {
   console.log('Attempting to login to Discord...');
@@ -485,9 +451,7 @@ app.listen(port, () => {
     console.log(`🔗 Listening to GlaceYT : http://localhost:${port}`);
 });
 
-
 loginBot();
-
 
 client.on('shardDisconnect', (event, shardID) => {
   console.log(`❌ Bot disconnected from Discord (Shard ID: ${shardID}). Reason: ${event.reason}`);
