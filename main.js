@@ -408,7 +408,7 @@ async function kickInactiveMember(member, guild, serverConfig, lastActive) {
         console.log(`⚠️ Log channel ${serverConfig.logChannelId} not found`);
       }
     } catch (logError) {
-      console.error(`❌ Error logging kick:`, logError);
+      //console.error(`❌ Error logging kick:`, logError);
     }
     
     try {
